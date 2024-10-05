@@ -12,6 +12,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
     "@types/jest": "^29.5.12",
     "@types/node": "22.5.4",
     "aws-cdk": "2.161.1",

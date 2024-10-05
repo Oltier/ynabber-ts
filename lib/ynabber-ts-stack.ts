@@ -1,16 +1,10 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { YNABBER_SYNC, YnabberSync } from "./ynabber-sync/ynabber-sync";
 
 export class YnabberTsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    // The code that defines your stack goes here
-
-    // example resource
-    // const queue = new sqs.Queue(this, 'YnabberTs2Queue', {
-    //   visibilityTimeout: cdk.Duration.seconds(300)
-    // });
+    new YnabberSync(this, YNABBER_SYNC);
   }
 }
