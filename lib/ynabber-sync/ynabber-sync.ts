@@ -11,6 +11,7 @@ import { toEnvVars } from "../utils/objectUtils";
 import { arm64EuCentral1SsmLayer } from "../ssm/SsmLayer";
 import {
   Effect,
+  ManagedPolicy,
   PolicyStatement,
   Role,
   ServicePrincipal,
@@ -61,6 +62,18 @@ export class YnabberSync extends Construct {
       }),
     );
 
+    lambdaRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName(
+        "service-role/AWSLambdaBasicExecutionRole",
+      ),
+    );
+
+    lambdaRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName(
+        "service-role/AWSLambdaVPCAccessExecutionRole",
+      ),
+    );
+
     const lambda = new NodejsFunction(this, FUNCTION, {
       runtime: Runtime.NODEJS_20_X,
       architecture: Architecture.ARM_64,
@@ -71,6 +84,7 @@ export class YnabberSync extends Construct {
         ...toEnvVars(defaultSsmLayerProps),
       },
       role: lambdaRole,
+      logRetention: RetentionDays.ONE_MONTH,
     });
 
     lambda.addLayers(arm64EuCentral1SsmLayer(this, id));
