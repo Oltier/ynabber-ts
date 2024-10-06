@@ -1,5 +1,6 @@
 import { MongoClient } from "mongodb";
 import Repository from "./repository";
+import { Requisition } from "../source/gocardless";
 
 export type PayeeSource = "name" | "unstructured" | "additional";
 
@@ -15,12 +16,9 @@ export type YnabAuth = {
   refresh_token: string;
 };
 
-export type GoCardlessConnection = {
-  id: string;
-};
-
 export type YnabConnection = {
   budgetId: string;
+  accountMap: Record<string, string>;
 };
 
 export type Connection = {
@@ -30,7 +28,7 @@ export type Connection = {
     ynab: YnabAuth;
   };
   config: ConnectionConfig;
-  source: GoCardlessConnection;
+  requisition: Requisition;
   target: YnabConnection;
 };
 
