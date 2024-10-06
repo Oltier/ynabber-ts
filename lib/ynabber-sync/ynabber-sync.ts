@@ -26,7 +26,7 @@ const defaultSsmLayerProps: SsmLayerProps = {
   PARAMETERS_SECRETS_EXTENSION_CACHE_ENABLED: true,
   PARAMETERS_SECRETS_EXTENSION_CACHE_SIZE: 1000,
   PARAMETERS_SECRETS_EXTENSION_HTTP_PORT: 2773,
-  PARAMETERS_SECRETS_EXTENSION_LOG_LEVEL: ParamsAndSecretsLogLevel.DEBUG,
+  PARAMETERS_SECRETS_EXTENSION_LOG_LEVEL: ParamsAndSecretsLogLevel.INFO,
   PARAMETERS_SECRETS_EXTENSION_MAX_CONNECTIONS: 3,
   SECRETS_MANAGER_TIMEOUT_MILLIS: 0,
   SECRETS_MANAGER_TTL: 300,
@@ -79,7 +79,7 @@ export class YnabberSync extends Construct {
       architecture: Architecture.ARM_64,
       retryAttempts: 0,
       timeout: Duration.seconds(LAMBDA_TIMEOUT_SEC),
-      memorySize: 256,
+      memorySize: 512,
       environment: {
         ...toEnvVars(defaultSsmLayerProps),
       },

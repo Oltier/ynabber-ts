@@ -38,7 +38,7 @@ export const handler = async (
 
   // Fetch connection config
   const connectionId = event.detail.connectionId;
-  const connection = connectionRepository.findOne({ id: connectionId });
+  const connection = await connectionRepository.findOne({ id: connectionId });
 
   if (!connection) {
     console.info(`Connection not found for id: ${connectionId}`);
