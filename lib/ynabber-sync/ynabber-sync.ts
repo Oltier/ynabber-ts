@@ -7,7 +7,7 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Duration } from "aws-cdk-lib";
-import { toEnvVars } from "../utils/objectUtils";
+import { toEnvVars } from "../utils/object-utils";
 import { arm64EuCentral1SsmLayer } from "../ssm/SsmLayer";
 import {
   Effect,
