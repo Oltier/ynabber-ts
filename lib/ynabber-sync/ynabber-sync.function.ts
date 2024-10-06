@@ -29,7 +29,10 @@ export const handler = async (
   );
 
   if (!client) {
-    client = await MongoClient.connect(secrets.mongoConnectionString);
+    client = await MongoClient.connect(secrets.mongoConnectionString, {
+      connectTimeoutMS: 5000,
+      maxIdleTimeMS: 60000,
+    });
     connectionRepository = new ConnectionRepository(client);
   }
 
