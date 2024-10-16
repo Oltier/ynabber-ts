@@ -1,4 +1,8 @@
-import { TransactionSchema } from "../generated/gocardless/Api";
+import {
+  Account as GoCardlessAccount,
+  Api,
+  TransactionSchema,
+} from "../generated/gocardless/Api";
 import {
   Account,
   TransactionState,
@@ -7,8 +11,13 @@ import {
 } from "../ynabber/transaction";
 import { Mapper } from "./mapper";
 import { min, parse } from "date-fns";
-import { ConnectionConfig } from "../repositories/connection-repository";
+import {
+  Connection,
+  ConnectionConfig,
+} from "../repositories/connection-repository";
 import { randomUUID } from "node:crypto";
+import NordigenClient from "nordigen-node";
+import { Logger } from "winston";
 
 function parseAmount(transaction: TransactionSchema): Money {
   const amount = Number.parseFloat(transaction.transactionAmount.amount);
@@ -113,16 +122,35 @@ export function parsePayee(
   return "";
 }
 
-export default class GoCardlessMapper implements Mapper<TransactionSchema> {
-  mapSourceToTransaction(
+function mapAccount(account: GoCardlessAccount): Account {
+  return {
+    id: account.id!,
+    name: account.iban!,
+    iban: account.iban!,
+  };
+}
+
+export default class GoCardlessMapper
+  implements Mapper<TransactionSchema, Api<unknown>>
+{
+  connection: Connection;
+  client: Api<unknown>;
+  logger: Logger;
+
+  constructor(connection: Connection, client: Api<unknown>, logger: Logger) {
+    this.connection = connection;
+    this.client = client;
+    this.logger = logger;
+  }
+
+  mapSourceTransactionToInternal(
     account: Account,
-    connectionConfig: ConnectionConfig,
     sourceTransaction: TransactionSchema,
     state: TransactionState,
   ): Transaction {
     const amount = parseAmount(sourceTransaction);
     const date = parseDate(sourceTransaction);
-    const payee = parsePayee(sourceTransaction, amount, connectionConfig);
+    const payee = parsePayee(sourceTransaction, amount, this.connection.config);
     const transactionId =
       sourceTransaction.transactionId ||
       sourceTransaction.internalTransactionId ||
@@ -140,5 +168,65 @@ export default class GoCardlessMapper implements Mapper<TransactionSchema> {
       amount,
       state,
     };
+  }
+
+  async fetchTransactions(): Promise<Transaction[]> {
+    const accounts = await Promise.all([
+      ...(this.connection.requisition.accounts || []).map(async (accountId) => {
+        const accountResponse =
+          await this.client.api.retrieveAccountMetadata(accountId);
+        return accountResponse.data;
+      }),
+    ]);
+    this.logger.info("accounts: ", accounts);
+    accounts
+      .filter(
+        (account) =>
+          account.status === "EXPIRED" || account.status === "SUSPENDED",
+      )
+      .forEach((account) => {
+        this.logger.warn(
+          `Account ${account.id} is ${account.status}. Skipping.`,
+        );
+      });
+
+    const activeAccounts = accounts.filter(
+      (account) =>
+        account.status !== "EXPIRED" && account.status !== "SUSPENDED",
+    );
+
+    return (
+      await Promise.all([
+        ...activeAccounts.map(async (account) => {
+          const res = await this.client.api.retrieveAccountTransactions(
+            account.id!,
+          );
+          return {
+            account,
+            bankTransaction: res.data,
+          };
+        }),
+      ])
+    )
+      .map(({ account, bankTransaction }) => {
+        const internalAccount = mapAccount(account);
+        return [
+          ...bankTransaction.booked.map((sourceTransaction) => {
+            return this.mapSourceTransactionToInternal(
+              internalAccount,
+              sourceTransaction,
+              "booked",
+            );
+          }),
+          ...(bankTransaction.pending || []).map((sourceTransaction) => {
+            return this.mapSourceTransactionToInternal(
+              internalAccount,
+              sourceTransaction,
+              "pending",
+            );
+          }),
+        ];
+      })
+      .flat();
   }
 }

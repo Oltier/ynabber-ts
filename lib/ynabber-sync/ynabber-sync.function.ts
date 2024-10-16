@@ -3,6 +3,7 @@ import { getSsmParameter } from "../ssm/SsmLayer";
 import { MongoClient } from "mongodb";
 import ConnectionRepository from "./repositories/connection-repository";
 import { createLogger, format, transports } from "winston";
+import GoCardlessMapper from "./reader/gocardless";
 
 type EventDetail = {
   connectionId: string;
@@ -49,10 +50,16 @@ export const handler = async (
   const connection = await connectionRepository.findOne({ id: connectionId });
 
   if (!connection) {
-    console.info(`Connection not found for id: ${connectionId}`);
+    logger.info(`Connection not found for id: ${connectionId}`);
     // TODO clean up connection
     return;
   }
 
-  console.log("connection: ", connection);
+  logger.log("connection: ", connection);
+
+  const transactions = await new GoCardlessMapper(
+    connection,
+  ).fetchTransactions();
+
+  logger.log("transactions: ", transactions);
 };

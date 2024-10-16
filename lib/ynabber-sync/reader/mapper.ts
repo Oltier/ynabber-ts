@@ -1,12 +1,19 @@
 import { Account, Transaction, TransactionState } from "../ynabber/transaction";
 import { TransactionSchema } from "../generated/gocardless/Api";
-import { ConnectionConfig } from "../repositories/connection-repository";
+import {
+  Connection,
+  ConnectionConfig,
+} from "../repositories/connection-repository";
 
-export interface Mapper<TSource> {
-  mapSourceToTransaction(
+export interface Mapper<TSource, TApi> {
+  connection: Connection;
+  client: TApi;
+
+  mapSourceTransactionToInternal(
     account: Account,
-    connectionConfig: ConnectionConfig,
     sourceTransaction: TSource,
     state: TransactionState,
   ): Transaction;
+
+  fetchTransactions(): Promise<Transaction[]>;
 }
