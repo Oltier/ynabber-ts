@@ -2,6 +2,7 @@ import { Context, EventBridgeEvent } from "aws-lambda";
 import { getSsmParameter } from "../ssm/SsmLayer";
 import { MongoClient } from "mongodb";
 import ConnectionRepository from "./repositories/connection-repository";
+import { createLogger, format, transports } from "winston";
 
 type EventDetail = {
   connectionId: string;
@@ -14,6 +15,12 @@ type Config = {
   mongoConnectionString: string;
 };
 
+const logger = createLogger({
+  level: process.env.LOG_LEVEL || "info",
+  format: format.json(),
+  transports: [new transports.Console()],
+});
+
 let client: MongoClient;
 let connectionRepository: ConnectionRepository;
 
@@ -21,6 +28,7 @@ export const handler = async (
   event: EventBridgeEvent<string, EventDetail>,
   context: Context,
 ): Promise<void> => {
+  logger.defaultMeta = { requestId: context.awsRequestId };
   const secrets = await getSsmParameter<Config>(
     "ynabber-sync",
     process.env.AWS_SESSION_TOKEN!,
