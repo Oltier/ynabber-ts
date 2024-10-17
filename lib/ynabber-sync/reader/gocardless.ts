@@ -166,7 +166,11 @@ export default class GoCardlessMapper
       sourceTransaction.internalTransactionId ||
       randomUUID().toString();
 
-    const memo = `${sourceTransaction.remittanceInformationUnstructured || sourceTransaction.remittanceInformationUnstructured}`;
+    const memo: string =
+      sourceTransaction.remittanceInformationUnstructured ||
+      sourceTransaction.remittanceInformationUnstructured ||
+      sourceTransaction.additionalInformation ||
+      "";
 
     return {
       account,
