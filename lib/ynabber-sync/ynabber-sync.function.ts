@@ -10,6 +10,7 @@ import {
   createGocardlessApiClient,
 } from "./clients/gocardless-client";
 import GocardlessOauthClient from "./clients/gocardless-oauth-client";
+import { Transaction } from "./ynabber/transaction";
 
 type EventDetail = {
   connectionId: string;
@@ -76,9 +77,9 @@ export const handler = async (
     return;
   }
 
-  logger.log("connection: ", connection);
+  logger.info("connection: ", connection);
 
-  let transactions;
+  let transactions: Transaction[] = [];
   try {
     transactions = await new GoCardlessMapper(
       connection,
@@ -87,16 +88,18 @@ export const handler = async (
     ).fetchTransactions();
   } catch (e) {
     logger.error("Error fetching transactions: ", e);
-    logger.info("try fetching new token");
-    gocardlessApiClient = createGocardlessApiClient({
-      authToken: (await gocardlessOauthClient.refreshAuthToken()).access,
-    });
-    transactions = await new GoCardlessMapper(
-      connection,
-      gocardlessApiClient,
-      logger,
-    ).fetchTransactions();
+    if (gocardlessOauthClient.isAccessExpired()) {
+      logger.info("access seems to be expired, try fetching new token");
+      gocardlessApiClient = createGocardlessApiClient({
+        authToken: (await gocardlessOauthClient.refreshAuthToken()).access,
+      });
+      transactions = await new GoCardlessMapper(
+        connection,
+        gocardlessApiClient,
+        logger,
+      ).fetchTransactions();
+    }
   }
 
-  logger.log("transactions: ", transactions);
+  logger.info("transactions: ", transactions);
 };

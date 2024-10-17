@@ -1,5 +1,6 @@
 import {
   Account as GoCardlessAccount,
+  BankTransaction,
   GocardlessApiClient,
   TransactionSchema,
 } from "../generated/gocardless/gocardless-api-client.generated";
@@ -209,32 +210,41 @@ export default class GoCardlessMapper
               date_to: format(Date.now(), "yyyy-MM-dd"),
             },
           );
+          this.logger.info("transaction response data: ", res.data);
           return {
             account,
-            bankTransaction: res.data,
+            transactions: res.data.transactions,
           };
         }),
       ])
     )
-      .map(({ account, bankTransaction }) => {
-        const internalAccount = mapAccount(account);
-        return [
-          ...bankTransaction.booked.map((sourceTransaction) => {
-            return this.mapSourceTransactionToInternal(
-              internalAccount,
-              sourceTransaction,
-              "booked",
-            );
-          }),
-          ...(bankTransaction.pending || []).map((sourceTransaction) => {
-            return this.mapSourceTransactionToInternal(
-              internalAccount,
-              sourceTransaction,
-              "pending",
-            );
-          }),
-        ];
-      })
+      .map(
+        ({
+          account,
+          transactions,
+        }: {
+          account: GoCardlessAccount;
+          transactions: BankTransaction;
+        }) => {
+          const internalAccount = mapAccount(account);
+          return [
+            ...transactions.booked.map((sourceTransaction) => {
+              return this.mapSourceTransactionToInternal(
+                internalAccount,
+                sourceTransaction,
+                "booked",
+              );
+            }),
+            ...(transactions.pending || []).map((sourceTransaction) => {
+              return this.mapSourceTransactionToInternal(
+                internalAccount,
+                sourceTransaction,
+                "pending",
+              );
+            }),
+          ];
+        },
+      )
       .flat();
   }
 }

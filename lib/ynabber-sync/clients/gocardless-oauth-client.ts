@@ -36,7 +36,7 @@ export default class GocardlessOauthClient {
     return (await this.refreshAuthToken()).access;
   }
 
-  private isAccessExpired(): boolean {
+  isAccessExpired(): boolean {
     if (!this.authTokens) {
       return true;
     }

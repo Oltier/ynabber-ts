@@ -16,5 +16,5 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 ## Codegen
 
 ```shell
-npx swagger-typescript-api -p "https://bankaccountdata.gocardless.com/api/v2/swagger.json" -o ./lib/ynabber-sync/generated/gocardless --api-class-name GocardlessApiClient --single-http-client --name gocardless-api-client.generated.ts
+npx swagger-typescript-api -p ./lib/ynabber-sync/schemas/gocardless.swagger.json -o ./lib/ynabber-sync/generated/gocardless --api-class-name GocardlessApiClient --single-http-client --name gocardless-api-client.generated.ts
 ```
