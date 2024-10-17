@@ -20,6 +20,9 @@ import { randomUUID } from "node:crypto";
 import { Logger } from "winston";
 import { AuthTokenSecurity } from "../clients/gocardless-client";
 
+function milliUnitsFromAmount(amount: number): number {
+  return amount * 1000;
+}
 function parseAmount(transaction: TransactionSchema): Money {
   const amount = Number.parseFloat(transaction.transactionAmount.amount);
 
@@ -30,7 +33,7 @@ function parseAmount(transaction: TransactionSchema): Money {
   }
 
   return {
-    value: amount,
+    milliUnits: milliUnitsFromAmount(amount),
     currency: transaction.transactionAmount.currency,
   };
 }
@@ -93,34 +96,36 @@ export function parsePayee(
   money: Money,
   connectionConfig: ConnectionConfig,
 ): string {
-  connectionConfig.payeeSource.forEach((source) => {
+  let payee = "";
+
+  for (const source of connectionConfig.payeeSource) {
+    if (payee !== "") break;
+
     switch (source) {
-      case "name":
-        if (money.value > 0) {
-          if (transaction.debtorName && transaction.debtorName !== "") {
-            return transaction.debtorName;
-          } else {
-            return transaction.creditorName || "";
-          }
-        } else {
-          if (transaction.creditorName && transaction.creditorName !== "") {
-            return transaction.creditorName;
-          } else {
-            return transaction.debtorName || "";
-          }
-        }
       case "unstructured":
-        return sanitizePayee(
+        payee = sanitizePayee(
           transaction.remittanceInformationUnstructured || "",
         );
-      case "additional":
-        return transaction.additionalInformation || "";
-      default:
-        throw new Error(`Unknown payee source: ${source}`);
-    }
-  });
+        break;
 
-  return "";
+      case "name":
+        if (money.milliUnits > 0) {
+          payee = transaction.debtorName || transaction.creditorName || "";
+        } else {
+          payee = transaction.creditorName || transaction.debtorName || "";
+        }
+        break;
+
+      case "additional":
+        payee = transaction.additionalInformation || "";
+        break;
+
+      default:
+        throw new Error(`Unrecognized PayeeSource: ${source}`);
+    }
+  }
+
+  return payee;
 }
 
 function mapAccount(account: GoCardlessAccount): Account {

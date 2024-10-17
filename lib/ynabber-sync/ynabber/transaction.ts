@@ -5,7 +5,8 @@ export type Account = {
 };
 
 export type Money = {
-  value: number;
+  // TODO handle other currencies?
+  milliUnits: number;
   currency: string;
 };
 

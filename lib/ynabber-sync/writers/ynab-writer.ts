@@ -13,7 +13,7 @@ export const PENDING_PREFIX = "PENDING ";
 
 export function getImportId(transaction: Transaction): string {
   const date = format(transaction.date, "yyyy-MM-dd");
-  const amountStr = transaction.amount.value.toFixed(2);
+  const amountStr = transaction.amount.milliUnits.toString();
 
   const s: string[] = [
     transaction.account.iban,
@@ -44,6 +44,10 @@ export default class YnabWriter
     this.ynabApiClient = new API(
       connection.auth?.ynab.accessToken || personalAccessToken,
     );
+
+    this.isValidTransaction = this.isValidTransaction.bind(this);
+    this.mapTransactionToWriterTransaction =
+      this.mapTransactionToWriterTransaction.bind(this);
   }
 
   isValidTransaction(transaction: Transaction): boolean {
@@ -67,7 +71,7 @@ export default class YnabWriter
 
   mapTransactionToWriterTransaction(transaction: Transaction): NewTransaction {
     const memo = `${transaction.state === "pending" ? PENDING_PREFIX : ""}${transaction.memo
-      .replace("  ", "")
+      .replace(/\s\s+/g, " ")
       .trim()
       .substring(0, MEMO_MAX_LENGTH)}`;
     return {
@@ -75,13 +79,13 @@ export default class YnabWriter
       date: format(transaction.date, "yyyy-MM-dd"),
       memo,
       payee_name: transaction.payee
-        .replace("  ", "")
+        .replace(/\s\s+/g, " ")
         .trim()
         .substring(0, PAYEE_NAME_MAX_LENGTH),
       // TODO better handling for this?
       cleared: transaction.state === "booked" ? "cleared" : "uncleared",
       approved: false,
-      amount: transaction.amount.value,
+      amount: transaction.amount.milliUnits,
       import_id: getImportId(transaction),
     };
   }

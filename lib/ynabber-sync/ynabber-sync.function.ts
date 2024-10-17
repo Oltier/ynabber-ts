@@ -106,7 +106,10 @@ export const handler = async (
 
   logger.info("transactions: ", transactions);
 
-  const ynabResponse = await ynabWriter.bulkWrite(transactions);
-
-  logger.info("ynabResponse: ", ynabResponse);
+  try {
+    const ynabResponse = await ynabWriter.bulkWrite(transactions);
+    logger.info("ynabResponse: ", ynabResponse);
+  } catch (e) {
+    logger.error("Error writing transactions: ", e);
+  }
 };
