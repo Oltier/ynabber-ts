@@ -10,7 +10,7 @@ import {
   TransactionState,
 } from "../ynabber/transaction";
 import { Mapper } from "./mapper";
-import { min, parse } from "date-fns";
+import { format, min, parse, sub } from "date-fns";
 import {
   Connection,
   ConnectionConfig,
@@ -204,6 +204,10 @@ export default class GoCardlessMapper
         ...activeAccounts.map(async (account) => {
           const res = await this.client.api.retrieveAccountTransactions(
             account.id!,
+            {
+              date_from: format(sub(Date.now(), { weeks: 2 }), "yyyy-MM-dd"),
+              date_to: format(Date.now(), "yyyy-MM-dd"),
+            },
           );
           return {
             account,
