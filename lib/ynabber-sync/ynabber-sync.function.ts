@@ -102,6 +102,8 @@ export const handler = async (
         logger,
       ).fetchTransactions();
     }
+
+    return;
   }
 
   logger.info("transactions: ", transactions);
