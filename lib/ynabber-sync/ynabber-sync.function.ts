@@ -11,6 +11,7 @@ import {
 } from "./clients/gocardless-client";
 import GocardlessOauthClient from "./clients/gocardless-oauth-client";
 import { Transaction } from "./ynabber/transaction";
+import YnabWriter from "./writers/ynab-writer";
 
 type EventDetail = {
   connectionId: string;
@@ -77,6 +78,8 @@ export const handler = async (
     return;
   }
 
+  const ynabWriter = new YnabWriter(connection, logger, secrets.ynabToken);
+
   logger.info("connection: ", connection);
 
   let transactions: Transaction[] = [];
@@ -102,4 +105,8 @@ export const handler = async (
   }
 
   logger.info("transactions: ", transactions);
+
+  const ynabResponse = await ynabWriter.bulkWrite(transactions);
+
+  logger.info("ynabResponse: ", ynabResponse);
 };

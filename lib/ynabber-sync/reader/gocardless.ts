@@ -161,8 +161,7 @@ export default class GoCardlessMapper
       sourceTransaction.internalTransactionId ||
       randomUUID().toString();
 
-    const pendingPrefix = state === "pending" ? "PENDING " : "";
-    const memo = `${pendingPrefix}${sourceTransaction.remittanceInformationUnstructured || sourceTransaction.remittanceInformationUnstructured}`;
+    const memo = `${sourceTransaction.remittanceInformationUnstructured || sourceTransaction.remittanceInformationUnstructured}`;
 
     return {
       account,
