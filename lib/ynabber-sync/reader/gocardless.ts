@@ -1,13 +1,13 @@
 import {
   Account as GoCardlessAccount,
-  Api,
+  GocardlessApiClient,
   TransactionSchema,
-} from "../generated/gocardless/Api";
+} from "../generated/gocardless/gocardless-api-client.generated";
 import {
   Account,
-  TransactionState,
-  Transaction,
   Money,
+  Transaction,
+  TransactionState,
 } from "../ynabber/transaction";
 import { Mapper } from "./mapper";
 import { min, parse } from "date-fns";
@@ -16,8 +16,8 @@ import {
   ConnectionConfig,
 } from "../repositories/connection-repository";
 import { randomUUID } from "node:crypto";
-import NordigenClient from "nordigen-node";
 import { Logger } from "winston";
+import { AuthTokenSecurity } from "../clients/gocardless-client";
 
 function parseAmount(transaction: TransactionSchema): Money {
   const amount = Number.parseFloat(transaction.transactionAmount.amount);
@@ -131,13 +131,17 @@ function mapAccount(account: GoCardlessAccount): Account {
 }
 
 export default class GoCardlessMapper
-  implements Mapper<TransactionSchema, Api<unknown>>
+  implements Mapper<TransactionSchema, GocardlessApiClient<AuthTokenSecurity>>
 {
   connection: Connection;
-  client: Api<unknown>;
+  client: GocardlessApiClient<AuthTokenSecurity>;
   logger: Logger;
 
-  constructor(connection: Connection, client: Api<unknown>, logger: Logger) {
+  constructor(
+    connection: Connection,
+    client: GocardlessApiClient<AuthTokenSecurity>,
+    logger: Logger,
+  ) {
     this.connection = connection;
     this.client = client;
     this.logger = logger;

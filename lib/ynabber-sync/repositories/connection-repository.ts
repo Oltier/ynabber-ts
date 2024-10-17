@@ -1,6 +1,6 @@
 import { MongoClient } from "mongodb";
 import Repository from "./repository";
-import { Requisition } from "../generated/gocardless/Api";
+import { Requisition } from "../generated/gocardless/gocardless-api-client.generated";
 
 export type PayeeSource = "name" | "unstructured" | "additional";
 

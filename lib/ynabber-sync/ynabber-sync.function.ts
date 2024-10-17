@@ -4,6 +4,12 @@ import { MongoClient } from "mongodb";
 import ConnectionRepository from "./repositories/connection-repository";
 import { createLogger, format, transports } from "winston";
 import GoCardlessMapper from "./reader/gocardless";
+import { GocardlessApiClient } from "./generated/gocardless/gocardless-api-client.generated";
+import {
+  AuthTokenSecurity,
+  createGocardlessApiClient,
+} from "./clients/gocardless-client";
+import GocardlessOauthClient from "./clients/gocardless-oauth-client";
 
 type EventDetail = {
   connectionId: string;
@@ -22,8 +28,10 @@ const logger = createLogger({
   transports: [new transports.Console()],
 });
 
-let client: MongoClient;
+let mongoClient: MongoClient;
 let connectionRepository: ConnectionRepository;
+let gocardlessOauthClient: GocardlessOauthClient;
+let gocardlessApiClient: GocardlessApiClient<AuthTokenSecurity>;
 
 export const handler = async (
   event: EventBridgeEvent<string, EventDetail>,
@@ -37,12 +45,25 @@ export const handler = async (
     process.env.PARAMETERS_SECRETS_EXTENSION_HTTP_PORT,
   );
 
-  if (!client) {
-    client = await MongoClient.connect(secrets.mongoConnectionString, {
+  if (!mongoClient) {
+    mongoClient = await MongoClient.connect(secrets.mongoConnectionString, {
       connectTimeoutMS: 5000,
       maxIdleTimeMS: 60000,
     });
-    connectionRepository = new ConnectionRepository(client);
+    connectionRepository = new ConnectionRepository(mongoClient);
+  }
+
+  if (!gocardlessOauthClient) {
+    gocardlessOauthClient = new GocardlessOauthClient({
+      secretId: secrets.goCardLessSecretId,
+      secretKey: secrets.goCardLessSecretKey,
+    });
+  }
+
+  if (!gocardlessApiClient) {
+    gocardlessApiClient = createGocardlessApiClient({
+      authToken: await gocardlessOauthClient.getAuthToken(),
+    });
   }
 
   // Fetch connection config
@@ -57,9 +78,25 @@ export const handler = async (
 
   logger.log("connection: ", connection);
 
-  const transactions = await new GoCardlessMapper(
-    connection,
-  ).fetchTransactions();
+  let transactions;
+  try {
+    transactions = await new GoCardlessMapper(
+      connection,
+      gocardlessApiClient,
+      logger,
+    ).fetchTransactions();
+  } catch (e) {
+    logger.error("Error fetching transactions: ", e);
+    logger.info("try fetching new token");
+    gocardlessApiClient = createGocardlessApiClient({
+      authToken: (await gocardlessOauthClient.refreshAuthToken()).access,
+    });
+    transactions = await new GoCardlessMapper(
+      connection,
+      gocardlessApiClient,
+      logger,
+    ).fetchTransactions();
+  }
 
   logger.log("transactions: ", transactions);
 };

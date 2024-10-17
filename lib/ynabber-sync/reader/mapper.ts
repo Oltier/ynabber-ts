@@ -1,9 +1,5 @@
 import { Account, Transaction, TransactionState } from "../ynabber/transaction";
-import { TransactionSchema } from "../generated/gocardless/Api";
-import {
-  Connection,
-  ConnectionConfig,
-} from "../repositories/connection-repository";
+import { Connection } from "../repositories/connection-repository";
 
 export interface Mapper<TSource, TApi> {
   connection: Connection;
