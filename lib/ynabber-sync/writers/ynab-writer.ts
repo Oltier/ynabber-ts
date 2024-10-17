@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 export const MEMO_MAX_LENGTH = 500;
 export const PAYEE_NAME_MAX_LENGTH = 200;
 export const PENDING_PREFIX = "PENDING ";
+export const HASH_PREFIX = "YBBRTZ";
 
 export function getImportId(transaction: Transaction): string {
   const date = format(transaction.date, "yyyy-MM-dd");
@@ -23,7 +24,7 @@ export function getImportId(transaction: Transaction): string {
     transaction.state,
   ];
   const hash = createHash("sha256").update(s.join("")).digest("hex");
-  return `YBBRTZ:${hash}`.substring(0, 32);
+  return `${HASH_PREFIX}:${hash}`.substring(0, 32);
 }
 
 export default class YnabWriter
