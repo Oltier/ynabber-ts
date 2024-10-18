@@ -1,11 +1,20 @@
 import * as cdk from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
+import { StackProps } from "aws-cdk-lib";
+import { Match, Template } from "aws-cdk-lib/assertions";
 import { YnabberTsStack } from "../lib/ynabber-ts-stack";
+import {
+  FUNCTION,
+  LAMBDA_TIMEOUT_SEC,
+  schedules,
+} from "../lib/ynabber-sync/ynabber-sync";
 
 describe("Ynabber Sync stack", () => {
   const app = new cdk.App();
   // WHEN
-  const stack = new YnabberTsStack(app, "MyTestStack");
+  const stackProps = {
+    env: { account: "307946656297", region: "eu-central-1" },
+  } satisfies StackProps;
+  const stack = new YnabberTsStack(app, "MyTestStack", stackProps);
   // THEN
   const template = Template.fromStack(stack);
 
@@ -20,65 +29,137 @@ describe("Ynabber Sync stack", () => {
       });
     });
 
-    it("should have a role with STS assumeRole actions", () => {
-      template.hasResourceProperties("AWS::IAM::Role", {
-        AssumeRolePolicyDocument: {
-          Statement: [
-            {
-              Action: "sts:AssumeRole",
-              Effect: "Allow",
-              Principal: {
-                Service: "lambda.amazonaws.com",
+    it("should have the correct timeout", () => {
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Timeout: LAMBDA_TIMEOUT_SEC,
+      });
+    });
+
+    it("should use ARM64 architecture", () => {
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Architectures: ["arm64"],
+      });
+    });
+
+    it("should have the correct memory size", () => {
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        MemorySize: 512,
+      });
+    });
+
+    it("should have the correct environment variables", () => {
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Environment: {
+          Variables: {
+            PARAMETERS_SECRETS_EXTENSION_CACHE_ENABLED: "true",
+            PARAMETERS_SECRETS_EXTENSION_CACHE_SIZE: "1000",
+            PARAMETERS_SECRETS_EXTENSION_HTTP_PORT: "2773",
+            PARAMETERS_SECRETS_EXTENSION_LOG_LEVEL: "info",
+            PARAMETERS_SECRETS_EXTENSION_MAX_CONNECTIONS: "3",
+            SECRETS_MANAGER_TIMEOUT_MILLIS: "0",
+            SECRETS_MANAGER_TTL: "300",
+            SSM_PARAMETER_STORE_TIMEOUT_MILLIS: "0",
+            SSM_PARAMETER_STORE_TTL: "300",
+          },
+        },
+      });
+    });
+
+    describe("Lambda permissions", () => {
+      it("should have a role with STS assumeRole actions", () => {
+        template.hasResourceProperties("AWS::IAM::Role", {
+          AssumeRolePolicyDocument: {
+            Statement: [
+              {
+                Action: "sts:AssumeRole",
+                Effect: "Allow",
+                Principal: {
+                  Service: "lambda.amazonaws.com",
+                },
               },
-            },
-          ],
-        },
-      });
-    });
-
-    it("should have a role with kms and ssm permissions", () => {
-      template.hasResourceProperties("AWS::IAM::Policy", {
-        PolicyDocument: {
-          Statement: [
-            {
-              Action: "kms:Decrypt",
-              Effect: "Allow",
-              Resource: "*",
-            },
-            {
-              Action: "ssm:GetParameter",
-              Effect: "Allow",
-              Resource: "*",
-            },
-          ],
-        },
-      });
-    });
-
-    it("should also add default lambda policies", () => {
-      template.hasResourceProperties("AWS::IAM::Role", {
-        ManagedPolicyArns: [
-          {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                { Ref: "AWS::Partition" },
-                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-              ],
             ],
           },
-          {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                { Ref: "AWS::Partition" },
-                ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
-              ],
-            ],
+        });
+      });
+
+      it("should have correct inline policies", () => {
+        template.hasResourceProperties("AWS::IAM::Policy", {
+          PolicyDocument: {
+            Statement: Match.arrayWith([
+              Match.objectLike({
+                Action: "kms:Decrypt",
+                Effect: "Allow",
+                Resource: "*",
+              }),
+              Match.objectLike({
+                Action: "ssm:GetParameter",
+                Effect: "Allow",
+                Resource: "*",
+              }),
+            ]),
           },
-        ],
+        });
+      });
+
+      it("should have correct managed policies attached", () => {
+        template.hasResourceProperties("AWS::IAM::Role", {
+          ManagedPolicyArns: [
+            {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  { Ref: "AWS::Partition" },
+                  ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                ],
+              ],
+            },
+            {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  { Ref: "AWS::Partition" },
+                  ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+                ],
+              ],
+            },
+          ],
+        });
+      });
+
+      it("should grant EventBridge permission to invoke Lambda", () => {
+        template.hasResourceProperties("AWS::Lambda::Permission", {
+          Action: "lambda:InvokeFunction",
+          Principal: "events.amazonaws.com",
+          SourceAccount: stackProps.env.account,
+        });
+      });
+    });
+  });
+
+  describe("EventBridge Rules", () => {
+    it("should create the correct number of EventBridge rules", () => {
+      template.resourceCountIs(
+        "AWS::Events::Rule",
+        Object.keys(schedules).length,
+      );
+    });
+
+    Object.entries(schedules).forEach(([connectionId, schedule]) => {
+      it(`should create a rule for connection ${connectionId} with correct properties`, () => {
+        template.hasResourceProperties("AWS::Events::Rule", {
+          ScheduleExpression: schedule.expressionString,
+          Targets: [
+            Match.objectLike({
+              Arn: {
+                "Fn::GetAtt": [Match.stringLikeRegexp(`${FUNCTION}.*`), "Arn"],
+              },
+              Id: "Target0",
+              Input: JSON.stringify({ connectionId }),
+            }),
+          ],
+        });
       });
     });
   });

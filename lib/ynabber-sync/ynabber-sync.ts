@@ -6,7 +6,7 @@ import {
   Runtime,
 } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { Duration } from "aws-cdk-lib";
+import { Duration, StackProps } from "aws-cdk-lib";
 import { toEnvVars } from "../utils/object-utils";
 import { arm64EuCentral1SsmLayer } from "../ssm/SsmLayer";
 import {
@@ -17,6 +17,8 @@ import {
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
+import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 
 export const FUNCTION = "function";
 export const YNABBER_SYNC = "ynabber-sync";
@@ -34,11 +36,30 @@ const defaultSsmLayerProps: SsmLayerProps = {
   SSM_PARAMETER_STORE_TTL: 300,
 };
 
+// Invocation schedules
+const OTP_CALLS_PER_DAY = 10;
+const NORDEA_CALLS_PER_DAY = 4;
+const INVOKE_OTP_LAMBDA_SCHEDULE_MINUTES = (24 * 60) / (OTP_CALLS_PER_DAY - 1);
+const INVOKE_NORDEA_LAMBDA_SCHEDULE_MINUTES =
+  (24 * 60) / (NORDEA_CALLS_PER_DAY - 1);
+
+export const schedules: Record<string, Schedule> = {
+  "e25d23fc-8332-43f8-9456-bcf679f6d5cc": Schedule.rate(
+    Duration.minutes(INVOKE_NORDEA_LAMBDA_SCHEDULE_MINUTES),
+  ),
+  "4769daee-1021-4605-b971-0ac628808ee1": Schedule.cron({
+    hour: "5,11,17,23",
+    minute: "0",
+  }),
+  "38c762d2-5de9-4f44-adfb-71180fbf25ab": Schedule.rate(
+    Duration.minutes(INVOKE_OTP_LAMBDA_SCHEDULE_MINUTES),
+  ),
+};
+
 export class YnabberSync extends Construct {
-  constructor(scope: Construct, id: string) {
+  constructor(scope: Construct, id: string, stackProps: StackProps) {
     super(scope, id);
 
-    // add ssm:GetParameter policy to the lambda
     const lambdaRole = new Role(this, `${id}Role`, {
       roleName: `${id}Role`,
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
@@ -88,5 +109,25 @@ export class YnabberSync extends Construct {
     });
 
     lambda.addLayers(arm64EuCentral1SsmLayer(this, id));
+
+    Object.entries(schedules).map(
+      ([connectionId, schedule]) =>
+        new Rule(this, `InvokeConnection-${connectionId}`, {
+          schedule,
+          targets: [
+            new LambdaFunction(lambda, {
+              event: RuleTargetInput.fromObject({
+                connectionId,
+              }),
+            }),
+          ],
+        }),
+    );
+
+    lambda.addPermission(`InvokeByEventBride-rule`, {
+      principal: new ServicePrincipal("events.amazonaws.com"),
+      action: "lambda:InvokeFunction",
+      sourceAccount: stackProps.env?.account,
+    });
   }
 }
