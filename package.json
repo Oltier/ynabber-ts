@@ -9,7 +9,8 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "prepare": "husky"
+    "prepare": "husky",
+    "codegen": "npx swagger-typescript-api -p ./lib/ynabber-sync/schemas/gocardless.swagger.json -o ./lib/ynabber-sync/generated/gocardless --api-class-name GocardlessApiClient --single-http-client --name gocardless-api-client.generated.ts"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",

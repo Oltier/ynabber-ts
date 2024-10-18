@@ -20,10 +20,11 @@ import { randomUUID } from "node:crypto";
 import { Logger } from "winston";
 import { AuthTokenSecurity } from "../clients/gocardless-client";
 
-function milliUnitsFromAmount(amount: number): number {
+export function milliUnitsFromAmount(amount: number): number {
   return amount * 1000;
 }
-function parseAmount(transaction: TransactionSchema): Money {
+
+export function parseAmount(transaction: TransactionSchema): Money {
   const amount = Number.parseFloat(transaction.transactionAmount.amount);
 
   if (Number.isNaN(amount)) {
@@ -38,7 +39,7 @@ function parseAmount(transaction: TransactionSchema): Money {
   };
 }
 
-function parseDate(transaction: TransactionSchema): Date {
+export function parseDate(transaction: TransactionSchema): Date {
   const valueDate = transaction.valueDate
     ? parse(transaction.valueDate, "yyyy-MM-dd", new Date())
     : null;
@@ -69,7 +70,7 @@ function parseDate(transaction: TransactionSchema): Date {
 }
 
 // sanitizePayee removes all non-alphanumeric characters from payee
-function sanitizePayee(payee: string): string {
+export function sanitizePayee(payee: string): string {
   if (payee.includes("xxxxxx")) {
     return extractPayee(payee).trim();
   }
@@ -81,7 +82,7 @@ function sanitizePayee(payee: string): string {
 
 // 516050xxxxxx5888 Purchase/Vásárlás 2024.01.12 11:51:39 Terminal:S0158104 BUDAPEST   SPAR MAGYARORSZAG KFT. Eredeti össz/Orig amt: 2085.00HUF
 // Extract SPAR MAGYARORSZAG KFT. from the string above
-function extractPayee(payee: string): string {
+export function extractPayee(payee: string): string {
   const splits = payee.split("   ");
   if (splits.length > 1) {
     payee = splits[1];
@@ -128,7 +129,7 @@ export function parsePayee(
   return payee;
 }
 
-function mapAccount(account: GoCardlessAccount): Account {
+export function mapAccount(account: GoCardlessAccount): Account {
   return {
     id: account.id!,
     name: account.iban!,
