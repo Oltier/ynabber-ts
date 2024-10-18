@@ -1,4 +1,4 @@
-import { Context } from "aws-lambda";
+import { Context, EventBridgeEvent } from "aws-lambda";
 import { getSsmParameter } from "../ssm/SsmLayer";
 import { MongoClient } from "mongodb";
 import ConnectionRepository from "./repositories/connection-repository";
@@ -13,7 +13,7 @@ import GocardlessOauthClient from "./clients/gocardless-oauth-client";
 import { Transaction } from "./ynabber/transaction";
 import YnabWriter from "./writers/ynab-writer";
 
-type EventDetail = {
+export type EventDetail = {
   connectionId: string;
 };
 
@@ -36,11 +36,10 @@ let gocardlessOauthClient: GocardlessOauthClient;
 let gocardlessApiClient: GocardlessApiClient<AuthTokenSecurity>;
 
 export const handler = async (
-  event: EventDetail,
+  event: EventBridgeEvent<string, EventDetail>,
   context: Context,
 ): Promise<void> => {
   logger.defaultMeta = { requestId: context.awsRequestId };
-  logger.info("event: ", event);
   const secrets = await getSsmParameter<Config>(
     "ynabber-sync",
     process.env.AWS_SESSION_TOKEN!,
@@ -70,7 +69,7 @@ export const handler = async (
   }
 
   // Fetch connection config
-  const { connectionId } = event;
+  const connectionId = event.detail.connectionId;
   const connection = await connectionRepository.findOne({ id: connectionId });
 
   if (!connection) {

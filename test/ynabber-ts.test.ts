@@ -6,6 +6,7 @@ import {
   FUNCTION,
   LAMBDA_TIMEOUT_SEC,
   schedules,
+  YNABBER_SYNC,
 } from "../lib/ynabber-sync/ynabber-sync";
 
 describe("Ynabber Sync stack", () => {
@@ -156,7 +157,25 @@ describe("Ynabber Sync stack", () => {
                 "Fn::GetAtt": [Match.stringLikeRegexp(`${FUNCTION}.*`), "Arn"],
               },
               Id: "Target0",
-              Input: JSON.stringify({ connectionId }),
+              Input: Match.serializedJson(
+                Match.objectLike({
+                  id: Match.stringLikeRegexp(
+                    "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  ),
+                  version: "1",
+                  account: stack.account,
+                  time: Match.stringLikeRegexp(
+                    "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+                  ),
+                  region: stack.region,
+                  resources: [],
+                  source: YNABBER_SYNC,
+                  "detail-type": "YnabberEventDetail",
+                  detail: {
+                    connectionId,
+                  },
+                }),
+              ),
             }),
           ],
         });

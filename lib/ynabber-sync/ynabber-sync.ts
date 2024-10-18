@@ -19,6 +19,9 @@ import {
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
+import { EventBridgeEvent } from "aws-lambda";
+import { EventDetail } from "./ynabber-sync.function";
+import { randomUUID } from "node:crypto";
 
 export const FUNCTION = "function";
 export const YNABBER_SYNC = "ynabber-sync";
@@ -117,8 +120,18 @@ export class YnabberSync extends Construct {
           targets: [
             new LambdaFunction(lambda, {
               event: RuleTargetInput.fromObject({
-                connectionId,
-              }),
+                id: randomUUID(),
+                version: "1",
+                account: stackProps.env?.account!,
+                time: new Date().toISOString(),
+                region: stackProps.env?.region!,
+                resources: [],
+                source: YNABBER_SYNC,
+                "detail-type": "YnabberEventDetail",
+                detail: {
+                  connectionId,
+                },
+              } satisfies EventBridgeEvent<string, EventDetail>),
             }),
           ],
         }),
