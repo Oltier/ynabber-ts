@@ -6,7 +6,6 @@ import {
   FUNCTION,
   LAMBDA_TIMEOUT_SEC,
   schedules,
-  YNABBER_SYNC,
 } from "../lib/ynabber-sync/ynabber-sync";
 
 describe("Ynabber Sync stack", () => {
@@ -128,57 +127,75 @@ describe("Ynabber Sync stack", () => {
           ],
         });
       });
-
-      it("should grant EventBridge permission to invoke Lambda", () => {
-        template.hasResourceProperties("AWS::Lambda::Permission", {
-          Action: "lambda:InvokeFunction",
-          Principal: "events.amazonaws.com",
-          SourceAccount: stackProps.env.account,
-        });
-      });
     });
   });
 
-  describe("EventBridge Rules", () => {
-    it("should create the correct number of EventBridge rules", () => {
+  describe("AWS Scheduler", () => {
+    it("should create the correct number of schedules", () => {
       template.resourceCountIs(
-        "AWS::Events::Rule",
+        "AWS::Scheduler::Schedule",
         Object.keys(schedules).length,
       );
     });
 
     Object.entries(schedules).forEach(([connectionId, schedule]) => {
-      it(`should create a rule for connection ${connectionId} with correct properties`, () => {
-        template.hasResourceProperties("AWS::Events::Rule", {
+      it(`should create a schedule for connection ${connectionId} with correct properties`, () => {
+        template.hasResourceProperties("AWS::Scheduler::Schedule", {
           ScheduleExpression: schedule.expressionString,
-          Targets: [
+          FlexibleTimeWindow: {
+            Mode: "OFF",
+          },
+          Target: Match.objectLike({
+            Arn: {
+              "Fn::GetAtt": [Match.stringLikeRegexp(`${FUNCTION}.*`), "Arn"],
+            },
+            RoleArn: {
+              "Fn::GetAtt": [
+                Match.stringLikeRegexp(`.*InvokeLambdaRole`),
+                "Arn",
+              ],
+            },
+            Input: Match.serializedJson(
+              Match.objectLike({
+                connectionId,
+              }),
+            ),
+          }),
+        });
+      });
+    });
+  });
+
+  describe("Invoke Lambda Role", () => {
+    it("should create an IAM role for invoking Lambda", () => {
+      template.hasResourceProperties("AWS::IAM::Role", {
+        AssumeRolePolicyDocument: Match.objectLike({
+          Statement: [
+            {
+              Action: "sts:AssumeRole",
+              Effect: "Allow",
+              Principal: {
+                Service: "scheduler.amazonaws.com",
+              },
+            },
+          ],
+        }),
+      });
+    });
+
+    it("should have correct inline policy to invoke Lambda", () => {
+      template.hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
             Match.objectLike({
-              Arn: {
+              Action: "lambda:InvokeFunction",
+              Effect: "Allow",
+              Resource: {
                 "Fn::GetAtt": [Match.stringLikeRegexp(`${FUNCTION}.*`), "Arn"],
               },
-              Id: "Target0",
-              Input: Match.serializedJson(
-                Match.objectLike({
-                  id: Match.stringLikeRegexp(
-                    "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-                  ),
-                  version: "1",
-                  account: stack.account,
-                  time: Match.stringLikeRegexp(
-                    "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-                  ),
-                  region: stack.region,
-                  resources: [],
-                  source: YNABBER_SYNC,
-                  "detail-type": "YnabberEventDetail",
-                  detail: {
-                    connectionId,
-                  },
-                }),
-              ),
             }),
-          ],
-        });
+          ]),
+        },
       });
     });
   });

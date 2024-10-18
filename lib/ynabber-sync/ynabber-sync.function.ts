@@ -1,4 +1,4 @@
-import { Context, EventBridgeEvent } from "aws-lambda";
+import { Context } from "aws-lambda";
 import { getSsmParameter } from "../ssm/SsmLayer";
 import { MongoClient } from "mongodb";
 import ConnectionRepository from "./repositories/connection-repository";
@@ -36,7 +36,7 @@ let gocardlessOauthClient: GocardlessOauthClient;
 let gocardlessApiClient: GocardlessApiClient<AuthTokenSecurity>;
 
 export const handler = async (
-  event: EventBridgeEvent<string, EventDetail>,
+  event: EventDetail,
   context: Context,
 ): Promise<void> => {
   logger.defaultMeta = { requestId: context.awsRequestId };
@@ -69,7 +69,7 @@ export const handler = async (
   }
 
   // Fetch connection config
-  const connectionId = event.detail.connectionId;
+  const connectionId = event.connectionId;
   const connection = await connectionRepository.findOne({ id: connectionId });
 
   if (!connection) {

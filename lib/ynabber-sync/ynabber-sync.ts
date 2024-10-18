@@ -17,11 +17,9 @@ import {
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
-import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
-import { EventBridgeEvent } from "aws-lambda";
+import { Schedule } from "aws-cdk-lib/aws-events";
+import { CfnSchedule } from "aws-cdk-lib/aws-scheduler";
 import { EventDetail } from "./ynabber-sync.function";
-import { randomUUID } from "node:crypto";
 
 export const FUNCTION = "function";
 export const YNABBER_SYNC = "ynabber-sync";
@@ -113,34 +111,34 @@ export class YnabberSync extends Construct {
 
     lambda.addLayers(arm64EuCentral1SsmLayer(this, id));
 
-    Object.entries(schedules).map(
-      ([connectionId, schedule]) =>
-        new Rule(this, `InvokeConnection-${connectionId}`, {
-          schedule,
-          targets: [
-            new LambdaFunction(lambda, {
-              event: RuleTargetInput.fromObject({
-                id: randomUUID(),
-                version: "1",
-                account: stackProps.env?.account!,
-                time: new Date().toISOString(),
-                region: stackProps.env?.region!,
-                resources: [],
-                source: YNABBER_SYNC,
-                "detail-type": "YnabberEventDetail",
-                detail: {
-                  connectionId,
-                },
-              } satisfies EventBridgeEvent<string, EventDetail>),
-            }),
-          ],
-        }),
+    const invokeLambdaRole = new Role(this, `${id}InvokeLambdaRole`, {
+      roleName: `${id}InvokeLambdaRole`,
+      assumedBy: new ServicePrincipal("scheduler.amazonaws.com"),
+    });
+
+    invokeLambdaRole.addToPolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["lambda:InvokeFunction"],
+        resources: [lambda.functionArn],
+      }),
     );
 
-    lambda.addPermission(`InvokeByEventBride-rule`, {
-      principal: new ServicePrincipal("events.amazonaws.com"),
-      action: "lambda:InvokeFunction",
-      sourceAccount: stackProps.env?.account,
-    });
+    Object.entries(schedules).map(
+      ([connectionId, schedule]) =>
+        new CfnSchedule(this, `InvokeConnection-${connectionId}`, {
+          scheduleExpression: schedule.expressionString,
+          flexibleTimeWindow: {
+            mode: "OFF",
+          },
+          target: {
+            arn: lambda.functionArn,
+            roleArn: invokeLambdaRole.roleArn,
+            input: JSON.stringify({
+              connectionId,
+            } satisfies EventDetail),
+          },
+        }),
+    );
   }
 }
