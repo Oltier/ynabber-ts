@@ -17,7 +17,7 @@ export type EventDetail = {
   connectionId: string;
 };
 
-type Config = {
+export type Config = {
   goCardLessSecretId: string;
   goCardLessSecretKey: string;
   ynabToken: string;
